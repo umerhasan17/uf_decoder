@@ -467,29 +467,60 @@ void collect_graph_and_decode(int n_qbt, int n_syndr, uint8_t num_nb_max_qbt, ui
   free(g.parity);
 }
 
-/* given graph and syndrome, compute decoding in batches of nrep repetitions */
-void collect_graph_and_decode_batch(int n_qbt, int n_syndr, uint8_t num_nb_max_qbt, uint8_t num_nb_max_syndr, int* nn_qbt, int* nn_syndr, uint8_t* len_nb, bool* syndrome, bool* erasure, bool* decode, int nrep){
+/* wrapper that uses Algorithm 1 (get_even_clusters_bfs) */
+void collect_graph_and_decode_alg1(int n_qbt, int n_syndr, uint8_t num_nb_max_qbt, uint8_t num_nb_max_syndr, int* nn_qbt, int* nn_syndr, uint8_t* len_nb, bool* syndrome, bool* erasure, bool* decode){
   Graph g;
   g.n_qbt = n_qbt;
   g.n_syndr = n_syndr;
-  g.ptr = malloc((n_qbt + n_syndr) * sizeof(int)); // if ptr[i]>0: parent index ("pointer"), elif ptr[i]<0: size of cluster, qubits and syndromes
-  g.nn_qbt = nn_qbt; // neighbors of data qubit
-  g.nn_syndr = nn_syndr; // neighbors of syndrome
-  g.len_nb = len_nb; // until which index there are neighbors (255 neighbors max)
-  g.num_nb_max_qbt = num_nb_max_qbt; // maximum number of neighbors per data qubit
-  g.num_nb_max_syndr = num_nb_max_syndr; // maximum number of neighbors per syndrome
-  g.visited = malloc((n_qbt + n_syndr) * sizeof(bool)); // node visited (e.g. in breadth-first traversal)
-  g.parity = malloc((n_qbt + n_syndr) * sizeof(bool)); // parity of syndromes in cluster (has meaning only for root node), 0: even number of syndromes
+  g.ptr = malloc((n_qbt + n_syndr) * sizeof(int));
+  g.nn_qbt = nn_qbt;
+  g.nn_syndr = nn_syndr;
+  g.len_nb = len_nb;
+  g.num_nb_max_qbt = num_nb_max_qbt;
+  g.num_nb_max_syndr = num_nb_max_syndr;
+  g.visited = malloc((n_qbt + n_syndr) * sizeof(bool));
+  g.syndrome = syndrome;
+  g.erasure = erasure;
+  g.parity = malloc((n_qbt + n_syndr) * sizeof(bool));
+  g.decode = decode;
+  memset(g.parity, 0, g.n_qbt * sizeof(bool));
+  memcpy(g.parity + g.n_qbt, g.syndrome, g.n_syndr * sizeof(bool));
+
+  int num_syndrome = 0;
+  for(int i=0; i<g.n_syndr; i++) if(syndrome[i]) num_syndrome++;
+  get_even_clusters_bfs(&g, num_syndrome);
+  Forest f = get_forest(&g);
+  peel_forest(&f, &g);
+  free_forest(&f);
+
+  free(g.ptr);
+  free(g.visited);
+  free(g.parity);
+}
+
+/* batch wrapper for Algorithm 1 */
+void collect_graph_and_decode_batch_alg1(int n_qbt, int n_syndr, uint8_t num_nb_max_qbt, uint8_t num_nb_max_syndr, int* nn_qbt, int* nn_syndr, uint8_t* len_nb, bool* syndrome, bool* erasure, bool* decode, int nrep){
+  Graph g;
+  g.n_qbt = n_qbt;
+  g.n_syndr = n_syndr;
+  g.ptr = malloc((n_qbt + n_syndr) * sizeof(int));
+  g.nn_qbt = nn_qbt;
+  g.nn_syndr = nn_syndr;
+  g.len_nb = len_nb;
+  g.num_nb_max_qbt = num_nb_max_qbt;
+  g.num_nb_max_syndr = num_nb_max_syndr;
+  g.visited = malloc((n_qbt + n_syndr) * sizeof(bool));
+  g.parity = malloc((n_qbt + n_syndr) * sizeof(bool));
 
   for(int r=0; r<nrep; r++){
     g.syndrome = syndrome + r*g.n_syndr;
     g.decode = decode + r*g.n_qbt; // decoder output
     g.erasure = erasure + r*g.n_qbt;
     memset(g.parity, 0, g.n_qbt * sizeof(bool));
-    memcpy(g.parity + g.n_qbt, g.syndrome, g.n_syndr * sizeof(bool)); // syndrome and parity of cluster starts as the same thing (when all nodes are isolated)
+    memcpy(g.parity + g.n_qbt, g.syndrome, g.n_syndr * sizeof(bool));
     int num_syndrome = 0;
     for(int i=0; i<g.n_syndr; i++) if(g.syndrome[i]) num_syndrome++;
-    get_even_clusters_bfs_skip_store_root(&g, num_syndrome);
+    get_even_clusters_bfs(&g, num_syndrome);
     Forest f = get_forest(&g);
     peel_forest(&f, &g);
     free_forest(&f);
@@ -499,4 +530,3 @@ void collect_graph_and_decode_batch(int n_qbt, int n_syndr, uint8_t num_nb_max_q
   free(g.visited);
   free(g.parity);
 }
-

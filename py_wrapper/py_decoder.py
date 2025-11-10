@@ -63,8 +63,17 @@ class UFDecoder:
                                            ctypes.c_void_p(self.nn_qbt.ctypes.data), ctypes.c_void_p(self.nn_syndr.ctypes.data), ctypes.c_void_p(self.len_nb.ctypes.data),
                                            ctypes.c_void_p(a_syndrome.ctypes.data), ctypes.c_void_p(a_erasure.ctypes.data), ctypes.c_void_p(self.correction.ctypes.data))
 
-    def decode_batch(self, a_syndrome, a_erasure, nrep):
-        self.decode_lib.collect_graph_and_decode_batch(ctypes.c_int(self.n_qbt), ctypes.c_int(self.n_syndr), ctypes.c_uint8(self.num_nb_max_qbt), ctypes.c_uint8(self.num_nb_max_syndr),
+    def decode_alg1(self, a_syndrome, a_erasure):
+        """Call the Algorithm 1 C wrapper (get_even_clusters_bfs).
+        Same signature/behavior as `decode` but uses Algorithm 1 internally.
+        """
+        self.decode_lib.collect_graph_and_decode_alg1(ctypes.c_int(self.n_qbt), ctypes.c_int(self.n_syndr), ctypes.c_uint8(self.num_nb_max_qbt), ctypes.c_uint8(self.num_nb_max_syndr),
+                                           ctypes.c_void_p(self.nn_qbt.ctypes.data), ctypes.c_void_p(self.nn_syndr.ctypes.data), ctypes.c_void_p(self.len_nb.ctypes.data),
+                                           ctypes.c_void_p(a_syndrome.ctypes.data), ctypes.c_void_p(a_erasure.ctypes.data), ctypes.c_void_p(self.correction.ctypes.data))
+
+    def decode_batch_alg1(self, a_syndrome, a_erasure, nrep):
+        """Batch decode using Algorithm 1."""
+        self.decode_lib.collect_graph_and_decode_batch_alg1(ctypes.c_int(self.n_qbt), ctypes.c_int(self.n_syndr), ctypes.c_uint8(self.num_nb_max_qbt), ctypes.c_uint8(self.num_nb_max_syndr),
                                            ctypes.c_void_p(self.nn_qbt.ctypes.data), ctypes.c_void_p(self.nn_syndr.ctypes.data), ctypes.c_void_p(self.len_nb.ctypes.data),
                                            ctypes.c_void_p(a_syndrome.ctypes.data), ctypes.c_void_p(a_erasure.ctypes.data), ctypes.c_void_p(self.correction.ctypes.data), ctypes.c_int(nrep))
 
@@ -134,4 +143,3 @@ if __name__ == '__main__':
             err_plus_correction = np.logical_xor(error, g.correction)
             syndrome = g.h @ err_plus_correction % 2
             print('sum syndrome: ', np.sum(syndrome))
-
